@@ -1,0 +1,64 @@
+@import 'tailwindcss';
+
+/* Scenic Route (1a) — vintage atlas & park-plaque warmth. Tokens per design handoff. */
+@theme {
+  --font-sans: 'Overpass', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bitter', Georgia, serif;
+
+  /* Surfaces & ink */
+  --color-paper: #f7f2e8;
+  --color-card: #fdfbf4;
+  --color-ink: #2a251c;
+
+  /* Warm neutral ramp — overrides Tailwind stone so existing stone-* classes go warm */
+  --color-stone-50: #f7f2e8;
+  --color-stone-100: #ede5d2;
+  --color-stone-200: #e3dac6;
+  --color-stone-300: #d8cdb4;
+  --color-stone-400: #c4b899;
+  --color-stone-500: #8a7f6c;
+  --color-stone-600: #6e6555;
+  --color-stone-700: #4c463a;
+  --color-stone-800: #3a3428;
+  --color-stone-900: #2a251c;
+
+  /* Forest — primary */
+  --color-primary-50: #eff3ee;
+  --color-primary-100: #dce5da;
+  --color-primary-500: #4a7257;
+  --color-primary-600: #3d6349;
+  --color-primary-700: #34573f;
+  --color-primary-800: #2b4834;
+  --color-primary-900: #24402e;
+
+  /* Pillars */
+  --color-input: #33647e;
+  --color-output: #b25226;
+  --color-output-deep: #a34a22;
+  --color-rest: #b98a2f;
+
+  /* Night drive (runner + break only) */
+  --color-night: #17241c;
+  --color-night-panel: #1f3026;
+  --color-night-border: #2c4033;
+  --color-night-sage: #8fa894;
+  --color-night-text: #f1eadb;
+  --color-dusk: #2e4e4a;
+  --color-dusk-deep: #223d35;
+  --color-sun: #d9b36a;
+
+  /* Rest banner (sleep nag) */
+  --color-rest-bg: #f8efd9;
+  --color-rest-border: #e5d3a1;
+  --color-rest-text: #7a5c1d;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  font-family: var(--font-sans);
+  @apply bg-paper text-ink antialiased;
+}
