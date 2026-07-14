@@ -9,6 +9,8 @@ import { ReviewScreen } from '../features/flashcards/ReviewScreen'
 import { DecksScreen } from '../features/flashcards/DecksScreen'
 import { DeckDetailScreen } from '../features/flashcards/DeckDetailScreen'
 import { LogsScreen } from '../features/logging/LogsScreen'
+import { SpeakingScreen } from '../features/speaking/SpeakingScreen'
+import { WritingScreen } from '../features/writing/WritingScreen'
 import { SettingsScreen } from '../features/settings/SettingsScreen'
 import { LoginScreen } from '../features/auth/LoginScreen'
 import { OnboardingScreen } from '../features/intention/OnboardingScreen'
@@ -38,6 +40,8 @@ export const router = createBrowserRouter([
               { path: '/review', element: <ReviewScreen /> },
               { path: '/decks', element: <DecksScreen /> },
               { path: '/decks/:deckId', element: <DeckDetailScreen /> },
+              { path: '/speaking', element: <SpeakingScreen /> },
+              { path: '/writing', element: <WritingScreen /> },
               { path: '/logs', element: <LogsScreen /> },
               { path: '/settings', element: <SettingsScreen /> },
             ],

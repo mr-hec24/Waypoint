@@ -67,6 +67,18 @@ export const activityLogRepo: ActivityLogRepo = {
     return (data as ActivityLogRow[]).map(rowToActivityLog)
   },
 
+  async byKind(userId, language, kind) {
+    const { data, error } = await requireSupabase()
+      .from('activity_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('language', language)
+      .eq('kind', kind)
+      .order('occurred_at', { ascending: false })
+    throwIfError(error)
+    return (data as ActivityLogRow[]).map(rowToActivityLog)
+  },
+
   async put(log) {
     const { error } = await requireSupabase().from('activity_logs').upsert({
       id: log.id,

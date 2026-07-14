@@ -20,7 +20,8 @@ export function WritingExercise({
   language,
 }: {
   userId: string
-  sessionId: string
+  /** Null when run standalone, outside a planned session. */
+  sessionId: string | null
   language: string
 }) {
   const [promptIndex, setPromptIndex] = useState(() =>

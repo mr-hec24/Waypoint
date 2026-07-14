@@ -2,6 +2,7 @@
 // Implementations live in src/services/supabase/.
 
 import type {
+  ActivityKind,
   ActivityLog,
   Course,
   Deck,
@@ -63,6 +64,8 @@ export interface ActivityLogRepo {
     toMs: number,
   ): Promise<ActivityLog[]>
   bySession(userId: string, sessionId: string): Promise<ActivityLog[]>
+  /** Full history of one activity kind for a journey, newest first. */
+  byKind(userId: string, language: string, kind: ActivityKind): Promise<ActivityLog[]>
   put(log: ActivityLog): Promise<void>
   /** Batch title update — one id for a single log, all attempt ids for a group. */
   setTitle(userId: string, ids: string[], title: string | null): Promise<void>

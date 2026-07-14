@@ -3,6 +3,8 @@ import { NavLink, Outlet } from 'react-router'
 const tabs = [
   { to: '/', label: 'Today' },
   { to: '/review', label: 'Review' },
+  { to: '/speaking', label: 'Speaking' },
+  { to: '/writing', label: 'Writing' },
   { to: '/logs', label: 'Logs' },
   { to: '/settings', label: 'Settings' },
 ]

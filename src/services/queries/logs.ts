@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../features/auth/AuthProvider'
 import { useActiveLanguage } from './profile'
 import { activityLogRepo, courseRepo, sleepLogRepo } from '../supabase/logRepos'
-import type { ActivityLog, Course, SleepLog } from '../../domain/entities'
+import type { ActivityKind, ActivityLog, Course, SleepLog } from '../../domain/entities'
 
 export function todayBounds(): { from: number; to: number } {
   const start = new Date()
@@ -23,6 +23,17 @@ export function useActivityLogs(fromMs: number, toMs: number) {
   return useQuery({
     queryKey: ['activityLogs', userId, language, fromMs, toMs],
     queryFn: () => activityLogRepo.byDateRange(userId!, language!, fromMs, toMs),
+    enabled: Boolean(userId && language),
+  })
+}
+
+/** Full history of one activity kind for the active journey, newest first. */
+export function useActivityLogsByKind(kind: ActivityKind) {
+  const { userId } = useAuth()
+  const language = useActiveLanguage()
+  return useQuery({
+    queryKey: ['activityLogs', userId, language, 'kind', kind],
+    queryFn: () => activityLogRepo.byKind(userId!, language!, kind),
     enabled: Boolean(userId && language),
   })
 }

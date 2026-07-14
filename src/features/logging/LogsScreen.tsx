@@ -3,7 +3,6 @@ import { Link } from 'react-router'
 import { useAuth } from '../auth/AuthProvider'
 import { useActiveLanguage } from '../../services/queries/profile'
 import { QuickLogForm } from './QuickLogForm'
-import { RecordingsTab } from './RecordingsTab'
 import {
   localDateString,
   useActivityLogs,
@@ -87,12 +86,16 @@ function OutputTab() {
   return (
     <div className="flex flex-col gap-6">
       <QuickLogForm kinds={['conversation', 'writing']} />
-      <div>
-        <p className="mb-2 text-xs font-semibold tracking-wide text-stone-400 uppercase">
-          Story recordings
-        </p>
-        <RecordingsTab />
-      </div>
+      <p className="text-xs text-stone-500">
+        Looking for your stories and writings? They have their own pages now —{' '}
+        <Link to="/speaking" className="font-bold text-primary-700 underline">
+          Speaking
+        </Link>{' '}
+        ·{' '}
+        <Link to="/writing" className="font-bold text-primary-700 underline">
+          Writing
+        </Link>
+      </p>
       <HistorySection pillar="output" />
     </div>
   )
