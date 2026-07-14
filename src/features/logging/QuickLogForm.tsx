@@ -65,6 +65,7 @@ export function QuickLogForm({ kinds }: { kinds?: ActivityKind[] }) {
       occurredAt: now,
       durationMinutes: minutes,
       notes: notes.trim(),
+      title: null,
       details: buildDetails(),
     } as ActivityLog)
     setNotes('')

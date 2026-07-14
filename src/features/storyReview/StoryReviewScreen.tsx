@@ -71,7 +71,14 @@ export function WritingReviewScreen() {
  * The three-column workbench (said/wrote · meant · correct). Used standalone
  * via the review screens and embedded inside the session runner's output leg.
  */
-export function StoryReviewWorkbench({ source }: { source: ReviewSource | undefined }) {
+export function StoryReviewWorkbench({
+  source,
+  onCardAdded,
+}: {
+  source: ReviewSource | undefined
+  /** Fired after a mined flashcard is saved — lets the host collect the words. */
+  onCardAdded?: (word: Word) => void
+}) {
   const { userId } = useAuth()
   const { data: profile } = useProfile()
 
@@ -267,6 +274,7 @@ export function StoryReviewWorkbench({ source }: { source: ReviewSource | undefi
       await saveWord.mutateAsync(word)
       updateRow(row.id, { wordIds: [...row.wordIds, word.id] })
       setAddedTerms((prev) => new Set(prev).add(`${row.id}:${suggestion.term}`))
+      onCardAdded?.(word)
     } catch (e) {
       setError((e as Error).message)
     }

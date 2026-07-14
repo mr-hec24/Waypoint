@@ -36,6 +36,16 @@ export function useSaveActivityLog() {
   })
 }
 
+export function useSetLogTitle() {
+  const { userId } = useAuth()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ ids, title }: { ids: string[]; title: string | null }) =>
+      activityLogRepo.setTitle(userId!, ids, title),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['activityLogs', userId] }),
+  })
+}
+
 export function useDeleteActivityLog() {
   const { userId } = useAuth()
   const queryClient = useQueryClient()

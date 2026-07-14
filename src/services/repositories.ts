@@ -64,6 +64,8 @@ export interface ActivityLogRepo {
   ): Promise<ActivityLog[]>
   bySession(userId: string, sessionId: string): Promise<ActivityLog[]>
   put(log: ActivityLog): Promise<void>
+  /** Batch title update — one id for a single log, all attempt ids for a group. */
+  setTitle(userId: string, ids: string[], title: string | null): Promise<void>
   remove(id: string): Promise<void>
 }
 

@@ -121,6 +121,8 @@ interface ActivityLogBase extends BaseEntity {
   occurredAt: number
   durationMinutes: number
   notes: string
+  /** User-given name; null = untitled (UI falls back to kind label / prompt). */
+  title: string | null
 }
 
 export interface FlashcardLog extends ActivityLogBase {
@@ -137,7 +139,14 @@ export interface ImmersionLog extends ActivityLogBase {
 }
 export interface StorySpeakingLog extends ActivityLogBase {
   kind: 'story_speaking'
-  details: { promptText: string; recordingId: string | null }
+  details: {
+    promptText: string
+    recordingId: string | null
+    /** One sitting's loop on one prompt; absent on legacy logs. */
+    attemptGroupId?: string
+    /** 1-based take number within the group. */
+    attemptNumber?: number
+  }
 }
 export interface WritingLog extends ActivityLogBase {
   kind: 'writing'

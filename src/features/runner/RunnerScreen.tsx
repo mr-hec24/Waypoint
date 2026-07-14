@@ -55,6 +55,7 @@ function buildSessionLogs(session: Session): ActivityLog[] {
         occurredAt: actual.startedAt,
         durationMinutes: minutes,
         notes: '',
+        title: null,
         details: emptyDetails[activity.kind],
       } as ActivityLog)
     }
