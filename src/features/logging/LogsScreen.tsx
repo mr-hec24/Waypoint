@@ -3,7 +3,6 @@ import { Link } from 'react-router'
 import { useAuth } from '../auth/AuthProvider'
 import { useActiveLanguage } from '../../services/queries/profile'
 import { QuickLogForm } from './QuickLogForm'
-import { RecordingsTab } from './RecordingsTab'
 import {
   localDateString,
   useActivityLogs,
@@ -12,9 +11,17 @@ import {
   useDeleteCourse,
   useSaveCourse,
   useSaveSleepLog,
+  useSetLogTitle,
   useSleepLogs,
 } from '../../services/queries/logs'
-import type { ActivityKind, ActivityLog, Pillar, SleepLog } from '../../domain/entities'
+import { groupHistory, groupTitle, type HistoryItem } from './grouping'
+import type {
+  ActivityKind,
+  ActivityLog,
+  Pillar,
+  SleepLog,
+  StorySpeakingLog,
+} from '../../domain/entities'
 
 const KIND_LABELS: Record<ActivityKind, string> = {
   flashcards: 'Flashcards',
@@ -79,12 +86,16 @@ function OutputTab() {
   return (
     <div className="flex flex-col gap-6">
       <QuickLogForm kinds={['conversation', 'writing']} />
-      <div>
-        <p className="mb-2 text-xs font-semibold tracking-wide text-stone-400 uppercase">
-          Story recordings
-        </p>
-        <RecordingsTab />
-      </div>
+      <p className="text-xs text-stone-500">
+        Looking for your stories and writings? They have their own pages now —{' '}
+        <Link to="/speaking" className="font-bold text-primary-700 underline">
+          Speaking
+        </Link>{' '}
+        ·{' '}
+        <Link to="/writing" className="font-bold text-primary-700 underline">
+          Writing
+        </Link>
+      </p>
       <HistorySection pillar="output" />
     </div>
   )
@@ -216,9 +227,20 @@ function LogDetails({ log }: { log: ActivityLog }) {
       )
     case 'story_speaking':
       return (
-        <p className="font-display text-[12.5px] text-stone-600 italic">
-          {log.details.promptText ? `Prompt — ${log.details.promptText}` : 'Story speaking take.'}
-        </p>
+        <div className="flex flex-col gap-2">
+          <p className="font-display text-[12.5px] text-stone-600 italic">
+            {log.details.promptText ? `Prompt — ${log.details.promptText}` : 'Story speaking take.'}
+            {log.details.attemptNumber != null && ` · Take ${log.details.attemptNumber}`}
+          </p>
+          {log.details.recordingId && (
+            <Link
+              to={`/recordings/${log.details.recordingId}/review`}
+              className="self-start rounded-lg border border-output px-3 pt-[6px] pb-[4px] text-xs font-bold text-output hover:bg-output/10"
+            >
+              Open review
+            </Link>
+          )}
+        </div>
       )
     case 'course':
       return (
@@ -248,8 +270,112 @@ function HistorySection({ pillar }: { pillar: Pillar }) {
   })
   const { data: logs, isLoading } = useActivityLogs(range.from, range.to)
   const deleteLog = useDeleteActivityLog()
+  const setLogTitle = useSetLogTitle()
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [draft, setDraft] = useState('')
   const filtered = logs?.filter((l) => l.pillar === pillar)
+  const items = filtered ? groupHistory(filtered) : undefined
+
+  function startRename(key: string, current: string | null) {
+    setEditingKey(key)
+    setDraft(current ?? '')
+  }
+
+  function commitRename(ids: string[], current: string | null) {
+    const trimmed = draft.trim()
+    setEditingKey(null)
+    if (trimmed === (current ?? '')) return
+    setLogTitle.mutate({ ids, title: trimmed || null })
+  }
+
+  function renderRow(item: HistoryItem) {
+    const key = item.type === 'single' ? item.log.id : item.groupId
+    const expanded = expandedId === key
+    const editing = editingKey === key
+    // Group title lives on every attempt; read it off the first one that has it.
+    const currentTitle =
+      item.type === 'single' ? item.log.title : (item.attempts.find((a) => a.title)?.title ?? null)
+    const ids = item.type === 'single' ? [item.log.id] : item.attempts.map((a) => a.id)
+    const latest = item.type === 'single' ? item.log : item.attempts[0]!
+    const totalMinutes =
+      item.type === 'single'
+        ? item.log.durationMinutes
+        : item.attempts.reduce((sum, a) => sum + a.durationMinutes, 0)
+    const primary =
+      item.type === 'single'
+        ? (item.log.title ?? KIND_LABELS[item.log.kind])
+        : groupTitle(item.attempts)
+
+    return (
+      <div key={key} className="rounded-xl border border-stone-200 bg-card px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <button
+            onClick={() => setExpandedId(expanded ? null : key)}
+            className="min-w-0 flex-1 text-left"
+          >
+            <p className="truncate text-sm font-bold">
+              {primary}
+              {item.type === 'group' && (
+                <span className="ml-1.5 text-xs font-semibold text-output">
+                  {item.attempts.length} attempt{item.attempts.length > 1 ? 's' : ''}
+                </span>
+              )}
+              <span className="ml-1.5 text-xs font-normal text-stone-400">
+                {expanded ? '▾' : '▸'}
+              </span>
+            </p>
+            <p className="truncate text-xs text-stone-500">
+              {(item.type === 'group' || item.log.title) &&
+                `${KIND_LABELS[latest.kind]} · `}
+              {new Date(latest.occurredAt).toLocaleString()} · {totalMinutes} min
+              {item.type === 'single' && item.log.notes && ` · ${item.log.notes}`}
+            </p>
+          </button>
+          <button
+            onClick={() => (editing ? setEditingKey(null) : startRename(key, currentTitle))}
+            title="Rename"
+            className="shrink-0 text-xs text-stone-500 hover:text-stone-700"
+          >
+            ✎
+          </button>
+          {item.type === 'single' && (
+            <button
+              onClick={() => deleteLog.mutate(item.log.id)}
+              className="shrink-0 text-xs text-stone-500 hover:text-output-deep"
+            >
+              Delete
+            </button>
+          )}
+        </div>
+
+        {editing && (
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => commitRename(ids, currentTitle)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitRename(ids, currentTitle)
+              if (e.key === 'Escape') setEditingKey(null)
+            }}
+            placeholder="Name this log — empty clears the name"
+            className={`mt-2 w-full ${inputClass}`}
+          />
+        )}
+
+        {expanded && (
+          <div className="mt-3 border-t border-stone-100 pt-3">
+            {item.type === 'single' ? (
+              <LogDetails log={item.log} />
+            ) : (
+              <GroupDetails attempts={item.attempts} onDelete={(id) => deleteLog.mutate(id)} />
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -260,41 +386,55 @@ function HistorySection({ pillar }: { pillar: Pillar }) {
       {filtered?.length === 0 && (
         <p className="text-sm text-stone-400">Nothing logged yet this week.</p>
       )}
-      {filtered?.map((log) => {
-        const expanded = expandedId === log.id
-        return (
-          <div key={log.id} className="rounded-xl border border-stone-200 bg-card px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <button
-                onClick={() => setExpandedId(expanded ? null : log.id)}
-                className="min-w-0 flex-1 text-left"
-              >
-                <p className="text-sm font-bold">
-                  {KIND_LABELS[log.kind]}
-                  <span className="ml-1.5 text-xs font-normal text-stone-400">
-                    {expanded ? '▾' : '▸'}
-                  </span>
-                </p>
-                <p className="truncate text-xs text-stone-500">
-                  {new Date(log.occurredAt).toLocaleString()} · {log.durationMinutes} min
-                  {log.notes && ` · ${log.notes}`}
-                </p>
-              </button>
-              <button
-                onClick={() => deleteLog.mutate(log.id)}
-                className="shrink-0 text-xs text-stone-500 hover:text-output-deep"
-              >
-                Delete
-              </button>
-            </div>
-            {expanded && (
-              <div className="mt-3 border-t border-stone-100 pt-3">
-                <LogDetails log={log} />
-              </div>
-            )}
+      {items?.map(renderRow)}
+    </div>
+  )
+}
+
+/** Expanded view of one sitting's story-speaking attempts on the same prompt. */
+function GroupDetails({
+  attempts,
+  onDelete,
+}: {
+  attempts: StorySpeakingLog[]
+  onDelete: (id: string) => void
+}) {
+  const promptText = attempts[0]?.details.promptText
+  return (
+    <div className="flex flex-col gap-1">
+      {promptText && (
+        <p className="font-display mb-1 text-[12.5px] text-stone-600 italic">
+          Prompt — {promptText}
+        </p>
+      )}
+      {attempts.map((a) => (
+        <div key={a.id} className="flex items-center justify-between gap-3 py-1">
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold">
+              Take {a.details.attemptNumber ?? '?'}
+            </p>
+            <p className="truncate text-xs text-stone-500">
+              {new Date(a.occurredAt).toLocaleString()} · {a.durationMinutes} min
+            </p>
           </div>
-        )
-      })}
+          <div className="flex shrink-0 items-center gap-3">
+            {a.details.recordingId && (
+              <Link
+                to={`/recordings/${a.details.recordingId}/review`}
+                className="text-xs font-bold text-output hover:underline"
+              >
+                Review
+              </Link>
+            )}
+            <button
+              onClick={() => onDelete(a.id)}
+              className="text-xs text-stone-500 hover:text-output-deep"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

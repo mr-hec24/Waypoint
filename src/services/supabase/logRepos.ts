@@ -13,6 +13,7 @@ interface ActivityLogRow extends BaseRow {
   occurred_at: string
   duration_minutes: number
   notes: string
+  title: string | null
   details: Record<string, unknown>
 }
 
@@ -26,6 +27,7 @@ function rowToActivityLog(row: ActivityLogRow): ActivityLog {
     occurredAt: tsToMs(row.occurred_at),
     durationMinutes: row.duration_minutes,
     notes: row.notes,
+    title: row.title ?? null,
     details: row.details,
   } as ActivityLog
 }
@@ -65,6 +67,18 @@ export const activityLogRepo: ActivityLogRepo = {
     return (data as ActivityLogRow[]).map(rowToActivityLog)
   },
 
+  async byKind(userId, language, kind) {
+    const { data, error } = await requireSupabase()
+      .from('activity_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('language', language)
+      .eq('kind', kind)
+      .order('occurred_at', { ascending: false })
+    throwIfError(error)
+    return (data as ActivityLogRow[]).map(rowToActivityLog)
+  },
+
   async put(log) {
     const { error } = await requireSupabase().from('activity_logs').upsert({
       id: log.id,
@@ -76,8 +90,19 @@ export const activityLogRepo: ActivityLogRepo = {
       occurred_at: msToIso(log.occurredAt),
       duration_minutes: log.durationMinutes,
       notes: log.notes,
+      title: log.title,
       details: log.details,
     })
+    throwIfError(error)
+  },
+
+  async setTitle(userId, ids, title) {
+    if (ids.length === 0) return
+    const { error } = await requireSupabase()
+      .from('activity_logs')
+      .update({ title })
+      .eq('user_id', userId)
+      .in('id', ids)
     throwIfError(error)
   },
 

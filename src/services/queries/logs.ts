@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../features/auth/AuthProvider'
 import { useActiveLanguage } from './profile'
 import { activityLogRepo, courseRepo, sleepLogRepo } from '../supabase/logRepos'
-import type { ActivityLog, Course, SleepLog } from '../../domain/entities'
+import type { ActivityKind, ActivityLog, Course, SleepLog } from '../../domain/entities'
 
 export function todayBounds(): { from: number; to: number } {
   const start = new Date()
@@ -27,11 +27,32 @@ export function useActivityLogs(fromMs: number, toMs: number) {
   })
 }
 
+/** Full history of one activity kind for the active journey, newest first. */
+export function useActivityLogsByKind(kind: ActivityKind) {
+  const { userId } = useAuth()
+  const language = useActiveLanguage()
+  return useQuery({
+    queryKey: ['activityLogs', userId, language, 'kind', kind],
+    queryFn: () => activityLogRepo.byKind(userId!, language!, kind),
+    enabled: Boolean(userId && language),
+  })
+}
+
 export function useSaveActivityLog() {
   const { userId } = useAuth()
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (log: ActivityLog) => activityLogRepo.put(log),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['activityLogs', userId] }),
+  })
+}
+
+export function useSetLogTitle() {
+  const { userId } = useAuth()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ ids, title }: { ids: string[]; title: string | null }) =>
+      activityLogRepo.setTitle(userId!, ids, title),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['activityLogs', userId] }),
   })
 }

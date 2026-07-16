@@ -43,6 +43,17 @@ export function useDeckWords(deckId: string | undefined) {
   })
 }
 
+/** Every word in the active journey, across decks — for source-based filtering. */
+export function useLanguageWords() {
+  const { userId } = useAuth()
+  const language = useActiveLanguage()
+  return useQuery({
+    queryKey: ['words', userId, 'language', language],
+    queryFn: () => wordRepo.listAll(userId!, { language: language! }),
+    enabled: Boolean(userId && language),
+  })
+}
+
 export function useSaveWord() {
   const { userId } = useAuth()
   const queryClient = useQueryClient()

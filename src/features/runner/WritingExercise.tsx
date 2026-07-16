@@ -20,13 +20,15 @@ export function WritingExercise({
   language,
 }: {
   userId: string
-  sessionId: string
+  /** Null when run standalone, outside a planned session. */
+  sessionId: string | null
   language: string
 }) {
   const [promptIndex, setPromptIndex] = useState(() =>
     Math.floor(Math.random() * WRITING_PROMPTS.length),
   )
   const [ownPrompt, setOwnPrompt] = useState<string | null>(null)
+  const [title, setTitle] = useState('')
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<number | null>(null)
@@ -59,6 +61,7 @@ export function WritingExercise({
         occurredAt: now,
         durationMinutes: minutes,
         notes: '',
+        title: title.trim() || null,
         details: { promptText: prompt, text },
       }
       await activityLogRepo.put(log)
@@ -119,6 +122,13 @@ export function WritingExercise({
           className="mt-2 w-full rounded-lg border border-stone-300 bg-card px-3 py-2 text-sm text-ink outline-none focus:ring-2 focus:ring-primary-700/40"
         />
       )}
+
+      <input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Name this writing (optional)"
+        className="mt-3 w-full rounded-lg border border-stone-300 bg-card px-3 py-2 text-sm text-ink outline-none focus:ring-2 focus:ring-primary-700/40"
+      />
 
       <textarea
         value={text}

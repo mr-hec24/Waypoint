@@ -248,7 +248,15 @@ function PracticeSetup({ onStart }: { onStart: (cards: Word[]) => void }) {
   )
 }
 
-function PracticeRunner({ cards, onExit }: { cards: Word[]; onExit: () => void }) {
+export function PracticeRunner({
+  cards,
+  onExit,
+  exitLabel = 'Back to review',
+}: {
+  cards: Word[]
+  onExit: () => void
+  exitLabel?: string
+}) {
   const [index, setIndex] = useState(0)
   const [revealed, setRevealed] = useState(false)
   const [hits, setHits] = useState(0)
@@ -266,7 +274,7 @@ function PracticeRunner({ cards, onExit }: { cards: Word[]; onExit: () => void }
         </h2>
         <p className="text-sm text-stone-500">Practice doesn&apos;t touch your schedule.</p>
         <button onClick={onExit} className="text-sm font-bold text-primary-700 underline">
-          Back to review
+          {exitLabel}
         </button>
       </div>
     )
