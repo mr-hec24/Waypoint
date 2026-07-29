@@ -4,14 +4,20 @@ import { useEffect, useRef, useState } from 'react'
  * A button that must be pressed and held for `holdMs` before firing.
  * Releasing early resets progress — this is the break-skip friction.
  */
+const DEFAULT_CLASS =
+  'rounded-[10px] border border-[rgba(241,234,219,.5)] px-5 pt-[13px] pb-[11px] text-sm font-bold text-night-text'
+
 export function HoldToConfirm({
   holdMs = 5000,
   onConfirm,
   children,
+  className,
 }: {
   holdMs?: number
   onConfirm: () => void
   children: React.ReactNode
+  /** Overrides the visual style; structural classes (progress fill) are always applied. */
+  className?: string
 }) {
   const [progress, setProgress] = useState(0)
   const raf = useRef<number | null>(null)
@@ -55,7 +61,7 @@ export function HoldToConfirm({
       onPointerLeave={stop}
       onPointerCancel={stop}
       onContextMenu={(e) => e.preventDefault()}
-      className="relative touch-none overflow-hidden rounded-[10px] border border-[rgba(241,234,219,.5)] px-5 pt-[13px] pb-[11px] text-sm font-bold text-night-text select-none"
+      className={`relative touch-none overflow-hidden select-none ${className ?? DEFAULT_CLASS}`}
     >
       <span
         aria-hidden

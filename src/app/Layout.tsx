@@ -5,6 +5,7 @@ const tabs = [
   { to: '/review', label: 'Review' },
   { to: '/speaking', label: 'Speaking' },
   { to: '/writing', label: 'Writing' },
+  { to: '/library', label: 'Library' },
   { to: '/logs', label: 'Logs' },
   { to: '/settings', label: 'Settings' },
 ]

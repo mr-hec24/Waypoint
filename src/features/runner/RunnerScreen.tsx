@@ -10,6 +10,7 @@ import { currentBlock } from '../../domain/session/machine'
 import { activityLogRepo } from '../../services/supabase/logRepos'
 import { StorySpeaking } from './StorySpeaking'
 import { WritingExercise } from './WritingExercise'
+import { StarredImmersionPanel } from '../library/StarredImmersionPanel'
 import { PILLAR_BY_KIND, type ActivityKind, type ActivityLog, type Session } from '../../domain/entities'
 
 /** One log per activity per block that actually ran, scaled to the block's real duration. */
@@ -252,22 +253,20 @@ export function RunnerScreen() {
         )}
 
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => {
-              if (confirm('End this block early?')) dispatch({ type: 'END_BLOCK', now: Date.now() })
-            }}
+          <HoldToConfirm
+            holdMs={1500}
+            onConfirm={() => dispatch({ type: 'END_BLOCK', now: Date.now() })}
             className="rounded-[10px] border border-[#3A5142] px-5 pt-[11px] pb-[9px] text-sm font-bold text-[#A9BCA9] hover:bg-night-panel"
           >
-            End block early
-          </button>
-          <button
-            onClick={() => {
-              if (confirm('Abandon the whole session?')) dispatch({ type: 'ABANDON', now: Date.now() })
-            }}
-            className="text-[13px] text-[#6E8272] hover:text-night-sage"
+            Hold to end block early
+          </HoldToConfirm>
+          <HoldToConfirm
+            holdMs={2500}
+            onConfirm={() => dispatch({ type: 'ABANDON', now: Date.now() })}
+            className="px-3 pt-[7px] pb-[5px] text-[13px] text-[#6E8272] hover:text-night-sage"
           >
-            Abandon
-          </button>
+            Hold to abandon
+          </HoldToConfirm>
         </div>
       </div>
     )
@@ -340,14 +339,13 @@ export function RunnerScreen() {
               </button>
             </>
           )}
-          <button
-            onClick={() => {
-              if (confirm('Abandon the whole session?')) dispatch({ type: 'ABANDON', now: Date.now() })
-            }}
-            className="text-xs text-[#7E958A] hover:text-[#C7D6C8]"
+          <HoldToConfirm
+            holdMs={2500}
+            onConfirm={() => dispatch({ type: 'ABANDON', now: Date.now() })}
+            className="px-3 pt-[6px] pb-[4px] text-xs text-[#7E958A] hover:text-[#C7D6C8]"
           >
-            Abandon session
-          </button>
+            Hold to abandon session
+          </HoldToConfirm>
         </div>
       </div>
     )
@@ -508,6 +506,17 @@ function HintCard({
 }
 
 function InputPanel({ kind }: { kind: ActivityKind }) {
+  if (kind === 'immersion') {
+    return (
+      <div className="flex w-full flex-col items-stretch gap-4">
+        <StarredImmersionPanel />
+        <HintCard title="Input · Immersion" tint="text-[#7FA8C2]">
+          Watch, listen, or read in your target language — pick something you actually enjoy.
+          It&apos;ll be logged automatically when the session ends.
+        </HintCard>
+      </div>
+    )
+  }
   if (kind === 'flashcards') {
     return (
       <HintCard title="Input · Flashcards" tint="text-[#7FA8C2]">
@@ -529,12 +538,7 @@ function InputPanel({ kind }: { kind: ActivityKind }) {
       </HintCard>
     )
   }
-  return (
-    <HintCard title="Input · Immersion" tint="text-[#7FA8C2]">
-      Watch, listen, or read in your target language — pick something you actually enjoy.
-      It&apos;ll be logged automatically when the session ends.
-    </HintCard>
-  )
+  return null
 }
 
 function OutputPanel({

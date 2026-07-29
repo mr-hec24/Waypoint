@@ -225,6 +225,37 @@ export interface Deck extends BaseEntity {
   language: string
 }
 
+// ---------- Immersion library ----------
+
+export type LibraryItemType = 'book' | 'show' | 'movie' | 'podcast' | 'music' | 'article'
+
+/** A saved piece of immersion content for one journey. At most one starred per (userId, language). */
+export interface LibraryItem extends BaseEntity {
+  language: string // which journey this belongs to
+  type: LibraryItemType
+  title: string
+  url: string | null // optional; source of in-app embed detection
+  starred: boolean // the single "focus" item — DB enforces one per (userId, language)
+}
+
+export const LIBRARY_ITEM_TYPES: { type: LibraryItemType; label: string }[] = [
+  { type: 'book', label: 'Book' },
+  { type: 'show', label: 'Show' },
+  { type: 'movie', label: 'Movie' },
+  { type: 'podcast', label: 'Podcast' },
+  { type: 'music', label: 'Music' },
+  { type: 'article', label: 'Article' },
+]
+
+export const LIBRARY_TYPE_LABEL: Record<LibraryItemType, string> = {
+  book: 'Book',
+  show: 'Show',
+  movie: 'Movie',
+  podcast: 'Podcast',
+  music: 'Music',
+  article: 'Article',
+}
+
 /** Append-only review history — replaying it enables future algorithm migration (e.g. FSRS). */
 export interface ReviewLog extends BaseEntity {
   wordId: string

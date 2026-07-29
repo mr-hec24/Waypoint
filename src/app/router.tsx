@@ -11,6 +11,7 @@ import { DeckDetailScreen } from '../features/flashcards/DeckDetailScreen'
 import { LogsScreen } from '../features/logging/LogsScreen'
 import { SpeakingScreen } from '../features/speaking/SpeakingScreen'
 import { WritingScreen } from '../features/writing/WritingScreen'
+import { LibraryScreen } from '../features/library/LibraryScreen'
 import { SettingsScreen } from '../features/settings/SettingsScreen'
 import { LoginScreen } from '../features/auth/LoginScreen'
 import { OnboardingScreen } from '../features/intention/OnboardingScreen'
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
               { path: '/decks/:deckId', element: <DeckDetailScreen /> },
               { path: '/speaking', element: <SpeakingScreen /> },
               { path: '/writing', element: <WritingScreen /> },
+              { path: '/library', element: <LibraryScreen /> },
               { path: '/logs', element: <LogsScreen /> },
               { path: '/settings', element: <SettingsScreen /> },
             ],
