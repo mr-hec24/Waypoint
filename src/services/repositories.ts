@@ -6,6 +6,7 @@ import type {
   ActivityLog,
   Course,
   Deck,
+  LibraryItem,
   Profile,
   Recording,
   ReviewLog,
@@ -32,6 +33,14 @@ export interface DeckRepo {
   listAll(userId: string, language?: string): Promise<Deck[]>
   put(deck: Deck): Promise<void>
   remove(id: string): Promise<void>
+}
+
+export interface LibraryRepo {
+  listAll(userId: string, language?: string): Promise<LibraryItem[]>
+  put(item: LibraryItem): Promise<void>
+  remove(id: string): Promise<void>
+  /** Stars exactly one item: clears any existing star for (userId, language), then stars id. */
+  setStarred(userId: string, language: string, id: string): Promise<void>
 }
 
 export interface WordRepo {
