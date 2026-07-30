@@ -1,8 +1,10 @@
 import { Link } from 'react-router'
-import { useStarredLibraryItem } from '../../services/queries/library'
+import { useStarredLibraryItem, useLogLibraryRepetition } from '../../services/queries/library'
 import { LIBRARY_TYPE_LABEL } from '../../domain/entities'
 import { parseEmbed } from './embed'
 import { EmbedPlayer } from './EmbedPlayer'
+import { RepProgress } from './RepProgress'
+import { repMessage } from './reps'
 
 // Shown during the Immersion input leg of a session. Surfaces the journey's single starred "focus"
 // item — embedding the player in-app for YouTube/Spotify so the learner doesn't wander off, and
@@ -10,6 +12,7 @@ import { EmbedPlayer } from './EmbedPlayer'
 
 export function StarredImmersionPanel() {
   const { data: item, isLoading } = useStarredLibraryItem()
+  const logRep = useLogLibraryRepetition()
 
   if (isLoading) return null
 
@@ -35,6 +38,18 @@ export function StarredImmersionPanel() {
       <p className="text-[11px] font-extrabold tracking-[.22em] text-night-sage uppercase">
         ★ Focus · {typeLabel}
       </p>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <RepProgress reps={item.repetitions} variant="night" />
+        <button
+          onClick={() => logRep.mutate(item)}
+          disabled={logRep.isPending}
+          className="rounded-lg border border-night-border px-3 pt-[6px] pb-[4px] text-xs font-bold text-[#D9A084] hover:bg-night-panel disabled:opacity-50"
+        >
+          + Log a rewatch
+        </button>
+      </div>
+      <p className="text-xs text-night-sage italic">{repMessage(item.repetitions)}</p>
 
       {embed.provider !== 'none' ? (
         <>

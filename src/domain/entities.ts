@@ -236,7 +236,12 @@ export interface LibraryItem extends BaseEntity {
   title: string
   url: string | null // optional; source of in-app embed detection
   starred: boolean // the single "focus" item — DB enforces one per (userId, language)
+  repetitions: number // how many times gone through — comprehensible input rewards repetition
+  lastRepAt: number | null // epoch ms of the most recent pass
 }
+
+/** Gentle default target for passes through one piece of content — a finish line, not a cap. */
+export const LIBRARY_REP_TARGET = 7
 
 export const LIBRARY_ITEM_TYPES: { type: LibraryItemType; label: string }[] = [
   { type: 'book', label: 'Book' },

@@ -1,7 +1,10 @@
 import { Link } from 'react-router'
 import { useProfile, useUpdateProfile } from '../../services/queries/profile'
 import { useActiveSession } from '../../services/queries/sessions'
+import { useStarredLibraryItem } from '../../services/queries/library'
 import { DestinationPlaque } from '../../components/DestinationPlaque'
+import { RepProgress } from '../library/RepProgress'
+import { repMessage } from '../library/reps'
 import { activeJourney } from '../../domain/entities'
 import {
   localDateString,
@@ -32,6 +35,7 @@ export function TodayScreen() {
   const updateProfile = useUpdateProfile()
   const journey = profile ? activeJourney(profile) : null
   const { data: activeSession } = useActiveSession()
+  const { data: focusItem } = useStarredLibraryItem()
   const bounds = todayBounds()
   const { data: todayLogs } = useActivityLogs(bounds.from, bounds.to)
   const { data: sleepLogs } = useSleepLogs(1)
@@ -96,6 +100,24 @@ export function TodayScreen() {
         <div className="mt-4">
           <DestinationPlaque statement={journey.intention.statement} />
         </div>
+      )}
+
+      {focusItem && (
+        <Link
+          to="/library"
+          className="mt-4 block rounded-xl border border-stone-200 bg-card px-4 py-3 hover:border-primary-700"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10.5px] font-extrabold tracking-[.18em] text-stone-500 uppercase">
+                ★ Current focus
+              </p>
+              <p className="truncate text-sm font-bold">{focusItem.title}</p>
+            </div>
+            <RepProgress reps={focusItem.repetitions} />
+          </div>
+          <p className="mt-1.5 text-xs text-stone-500 italic">{repMessage(focusItem.repetitions)}</p>
+        </Link>
       )}
 
       <div className="mt-5 grid grid-cols-2 gap-2.5">

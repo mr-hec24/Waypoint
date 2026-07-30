@@ -39,6 +39,22 @@ export function useDeleteLibraryItem() {
   })
 }
 
+/** Records one more pass through an item (manual "log a rewatch"): bumps the counter + timestamp. */
+export function useLogLibraryRepetition() {
+  const { userId } = useAuth()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (item: LibraryItem) =>
+      libraryRepo.put({
+        ...item,
+        repetitions: item.repetitions + 1,
+        lastRepAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['library', userId] }),
+  })
+}
+
 /** Stars exactly one item for the active journey, clearing any previous star. */
 export function useSetStarredLibraryItem() {
   const { userId } = useAuth()

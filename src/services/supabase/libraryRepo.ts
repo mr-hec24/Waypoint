@@ -1,7 +1,7 @@
 import { requireSupabase } from '../../lib/supabaseClient'
 import type { LibraryItem, LibraryItemType } from '../../domain/entities'
 import type { LibraryRepo } from '../repositories'
-import { baseFromRow, throwIfError, type BaseRow } from './mapping'
+import { baseFromRow, msToIso, throwIfError, tsToMs, type BaseRow } from './mapping'
 
 interface LibraryItemRow extends BaseRow {
   language: string
@@ -9,6 +9,8 @@ interface LibraryItemRow extends BaseRow {
   title: string
   url: string | null
   starred: boolean
+  repetitions: number
+  last_rep_at: string | null
 }
 
 function rowToItem(row: LibraryItemRow): LibraryItem {
@@ -19,6 +21,9 @@ function rowToItem(row: LibraryItemRow): LibraryItem {
     title: row.title,
     url: row.url,
     starred: row.starred,
+    // Default when the 0007 columns aren't present yet (deploy can precede the dashboard migration).
+    repetitions: row.repetitions ?? 0,
+    lastRepAt: row.last_rep_at ? tsToMs(row.last_rep_at) : null,
   }
 }
 
@@ -40,6 +45,8 @@ export const libraryRepo: LibraryRepo = {
       title: item.title,
       url: item.url,
       starred: item.starred,
+      repetitions: item.repetitions,
+      last_rep_at: item.lastRepAt ? msToIso(item.lastRepAt) : null,
     })
     throwIfError(error)
   },
