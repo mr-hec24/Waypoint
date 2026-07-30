@@ -15,6 +15,8 @@ import {
   useSleepLogs,
 } from '../../services/queries/logs'
 import { groupHistory, groupTitle, type HistoryItem } from './grouping'
+import { RestRecallInsight } from './RestRecallInsight'
+import { hoursSlept } from '../../domain/sleep/analysis'
 import type {
   ActivityKind,
   ActivityLog,
@@ -132,6 +134,7 @@ function RestTab() {
 
   return (
     <div className="flex flex-col gap-4">
+      <RestRecallInsight />
       <form
         onSubmit={handleSubmit}
         className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-card p-4"
@@ -178,18 +181,26 @@ function RestTab() {
         {saveSleep.isSuccess && <p className="text-xs text-primary-700">Saved.</p>}
       </form>
 
-      {sleepLogs?.map((log) => (
-        <div
-          key={log.id}
-          className="flex items-center justify-between rounded-xl border border-stone-200 bg-card px-4 py-3 text-sm"
-        >
-          <span>{log.date}</span>
-          <span className="text-stone-400">
-            {log.bedTime} → {log.wakeTime}
-          </span>
-          <span className="font-medium">{'★'.repeat(log.quality)}</span>
-        </div>
-      ))}
+      {sleepLogs?.map((log) => {
+        const hours = hoursSlept(log.bedTime, log.wakeTime)
+        return (
+          <div
+            key={log.id}
+            className="flex items-center justify-between rounded-xl border border-stone-200 bg-card px-4 py-3 text-sm"
+          >
+            <span>{log.date}</span>
+            <span className="text-stone-400">
+              {log.bedTime} → {log.wakeTime}
+              {hours !== null && (
+                <span className="ml-1.5 font-medium text-stone-500">
+                  · {hours % 1 === 0 ? hours : hours.toFixed(1)}h
+                </span>
+              )}
+            </span>
+            <span className="font-medium">{'★'.repeat(log.quality)}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }

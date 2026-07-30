@@ -94,6 +94,16 @@ export function useReviewQueue(newCardsPerDay: number) {
   })
 }
 
+/** Raw review history within a window — user-wide, for the rest→recall insight. */
+export function useReviewLogs(fromMs: number, toMs: number) {
+  const { userId } = useAuth()
+  return useQuery({
+    queryKey: ['reviewLogs', userId, fromMs, toMs],
+    queryFn: () => reviewLogRepo.byDateRange(userId!, fromMs, toMs),
+    enabled: Boolean(userId),
+  })
+}
+
 /** Applies SM-2, persists the word, and appends to the review log. */
 export function useGradeWord() {
   const { userId } = useAuth()

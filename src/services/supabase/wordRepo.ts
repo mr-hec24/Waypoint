@@ -128,6 +128,27 @@ export const wordRepo: WordRepo = {
   },
 }
 
+interface ReviewLogRow extends BaseRow {
+  word_id: string
+  reviewed_at: string
+  grade: ReviewLog['grade']
+  prev_interval_days: number
+  new_interval_days: number
+  ease: number
+}
+
+function rowToReviewLog(row: ReviewLogRow): ReviewLog {
+  return {
+    ...baseFromRow(row),
+    wordId: row.word_id,
+    reviewedAt: tsToMs(row.reviewed_at),
+    grade: row.grade,
+    prevIntervalDays: row.prev_interval_days,
+    newIntervalDays: row.new_interval_days,
+    ease: row.ease,
+  }
+}
+
 export const reviewLogRepo: ReviewLogRepo = {
   async append(log: ReviewLog) {
     const { error } = await requireSupabase().from('review_logs').insert({
@@ -141,5 +162,17 @@ export const reviewLogRepo: ReviewLogRepo = {
       ease: log.ease,
     })
     throwIfError(error)
+  },
+
+  async byDateRange(userId, fromMs, toMs) {
+    const { data, error } = await requireSupabase()
+      .from('review_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('reviewed_at', msToIso(fromMs))
+      .lte('reviewed_at', msToIso(toMs))
+      .order('reviewed_at', { ascending: false })
+    throwIfError(error)
+    return (data as ReviewLogRow[]).map(rowToReviewLog)
   },
 }

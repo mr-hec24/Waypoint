@@ -3,8 +3,10 @@ import { Link } from 'react-router'
 import { useAuth } from '../auth/AuthProvider'
 import { useActiveLanguage, useProfile } from '../../services/queries/profile'
 import { useDecks, useGradeWord, useReviewQueue } from '../../services/queries/flashcards'
+import { useSleepLogs, localDateString } from '../../services/queries/logs'
 import { wordRepo } from '../../services/supabase/wordRepo'
 import { pickPracticeCards, type PracticeOrder } from './practice'
+import { isRoughNight } from '../../domain/sleep/analysis'
 import type { SrsGrade, Word } from '../../domain/entities'
 
 const GRADES: { grade: SrsGrade; label: string; className: string }[] = [
@@ -17,14 +19,19 @@ const GRADES: { grade: SrsGrade; label: string; className: string }[] = [
 export function ReviewScreen() {
   const { data: profile } = useProfile()
   const { data: queue, isLoading } = useReviewQueue(profile?.settings.newCardsPerDay ?? 10)
+  const { data: todaySleep } = useSleepLogs(1)
   const gradeWord = useGradeWord()
 
   // Local queue: words graded "again" come back at the end of this same session.
   const [queueState, setQueueState] = useState<{ initial: Word[]; index: number; retry: Word[] } | null>(null)
   const [revealed, setRevealed] = useState(false)
   const [done, setDone] = useState(0)
+  const [againCount, setAgainCount] = useState(0)
   const [practiceCards, setPracticeCards] = useState<Word[] | null>(null)
   const [showSetup, setShowSetup] = useState(false)
+
+  const sleep = todaySleep?.[0]
+  const roughNight = Boolean(sleep && sleep.date === localDateString() && isRoughNight(sleep))
 
   if (isLoading) return <p className="text-sm text-stone-400">Loading queue…</p>
 
@@ -93,6 +100,7 @@ export function ReviewScreen() {
       retry: g === 0 ? [...state!.retry, { ...current }] : state!.retry,
     })
     setRevealed(false)
+    if (g === 0) setAgainCount((c) => c + 1)
     if (g !== 0) setDone((d) => d + 1)
   }
 
@@ -100,6 +108,9 @@ export function ReviewScreen() {
 
   return (
     <div className="flex flex-col items-center">
+      {roughNight && againCount >= 3 && (
+        <RoughNightBanner storageKey={`waypoint.roughNight.${localDateString()}`} />
+      )}
       <p className="mb-1 text-[10.5px] font-extrabold tracking-[.2em] text-stone-500 uppercase">
         {remaining} cards to go
       </p>
@@ -148,6 +159,36 @@ export function ReviewScreen() {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Gentle, dismissible reframe shown when the user logged a rough night and is
+ * racking up misses. Purely cosmetic — it never alters grading or scheduling;
+ * the SRS still brings missed cards back on its own.
+ */
+function RoughNightBanner({ storageKey }: { storageKey: string }) {
+  const [dismissed, setDismissed] = useState(() => sessionStorage.getItem(storageKey) === '1')
+  if (dismissed) return null
+  return (
+    <div className="mb-4 w-full max-w-md rounded-xl border border-rest-border bg-rest-bg px-4 py-3 text-rest-text">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[12.5px] leading-relaxed">
+          Rough night&apos;s sleep — today&apos;s misses aren&apos;t the real you. Just grade
+          honestly; the schedule brings these cards back.
+        </p>
+        <button
+          onClick={() => {
+            sessionStorage.setItem(storageKey, '1')
+            setDismissed(true)
+          }}
+          aria-label="Dismiss"
+          className="shrink-0 text-lg leading-none text-rest-text/60 hover:text-rest-text"
+        >
+          ×
+        </button>
       </div>
     </div>
   )

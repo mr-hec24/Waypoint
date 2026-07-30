@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { useProfile, useUpdateProfile } from '../../services/queries/profile'
 import { useActiveSession } from '../../services/queries/sessions'
 import { DestinationPlaque } from '../../components/DestinationPlaque'
+import { RestRecallInsight } from '../logging/RestRecallInsight'
 import { activeJourney } from '../../domain/entities'
 import {
   localDateString,
@@ -121,6 +122,10 @@ export function TodayScreen() {
           No sleep logged yet — rest is fuel for the roadtrip.
         </Link>
       )}
+
+      <div className="mt-3">
+        <RestRecallInsight hideUntilReady />
+      </div>
 
       {/* This week's route */}
       <div className="mt-6">

@@ -55,6 +55,8 @@ export interface WordRepo {
 
 export interface ReviewLogRepo {
   append(log: ReviewLog): Promise<void>
+  /** Reviews within a time window, for correlating recall with rest. */
+  byDateRange(userId: string, fromMs: number, toMs: number): Promise<ReviewLog[]>
 }
 
 export interface SessionRepo {
