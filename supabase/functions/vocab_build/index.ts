@@ -17,6 +17,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+/** Upper bound per call; the client chunks to 150 (normalize) and 60 (translate). */
+const MAX_ITEMS = 200
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -157,6 +160,15 @@ Deno.serve(async (req) => {
     mode === 'normalize' ? { candidates: candidates ?? [] } : { lemmas: lemmas ?? [] }
   const itemCount = mode === 'normalize' ? (candidates ?? []).length : (lemmas ?? []).length
   if (itemCount === 0) return json({ error: 'Nothing to process' }, 400)
+  // The worker is killed with HTTP 546 before a large generation finishes, and that
+  // kill leaves no response body to explain itself. Refuse oversized batches here,
+  // where we can still say why. The client chunks well below this.
+  if (itemCount > MAX_ITEMS) {
+    return json(
+      { error: `Too many items in one call (${itemCount}); the limit is ${MAX_ITEMS}.` },
+      400,
+    )
+  }
 
   // Confirm the caller is an authenticated user of this project.
   const userClient = createClient(
@@ -173,7 +185,8 @@ Deno.serve(async (req) => {
     // Streaming: max_tokens this large risks an HTTP timeout on a non-streaming call.
     const stream = anthropic.messages.stream({
       model: 'claude-opus-5',
-      max_tokens: 32000,
+      // Matches review_assist, which has proven it finishes inside the worker's budget.
+      max_tokens: 16000,
       thinking: { type: 'adaptive' },
       output_config: {
         format: {

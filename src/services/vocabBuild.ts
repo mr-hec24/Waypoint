@@ -5,8 +5,11 @@
 
 import { supabase } from '../lib/supabaseClient'
 
-/** Lemmas per translate call. Small enough to stay well inside the output budget. */
-const TRANSLATE_BATCH = 100
+// Batch sizes exist to stay inside the edge function's wall-clock budget. A single
+// call over the whole list gets the worker killed with HTTP 546 long before the model
+// finishes generating.
+const TRANSLATE_BATCH = 60
+const NORMALIZE_BATCH = 150
 
 export interface LemmaGroup {
   lemma: string
@@ -76,17 +79,62 @@ async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   return result
 }
 
-/** One call for the whole list, so merging decisions see every candidate at once. */
+/**
+ * Chunked, because one call over the whole list exceeds the edge function's budget.
+ *
+ * Candidates are sorted alphabetically before chunking rather than left in frequency
+ * order: that puts inflections of the same word next to each other ("go", "goes",
+ * "going"), so they usually land in the same chunk and can still be merged. Frequency
+ * order would scatter them, and a lemma split across two chunks stays split.
+ */
 export async function normalizeCandidates(
   nativeLanguage: string,
   candidates: { surface: string; count: number }[],
+  onProgress?: (done: number, total: number) => void,
 ): Promise<LemmaGroup[]> {
-  const result = await invoke<{ groups: LemmaGroup[] }>({
-    mode: 'normalize',
-    nativeLanguage,
-    candidates,
-  })
-  return result.groups ?? []
+  const ordered = [...candidates].sort((a, b) => a.surface.localeCompare(b.surface))
+  const groups: LemmaGroup[] = []
+
+  for (let i = 0; i < ordered.length; i += NORMALIZE_BATCH) {
+    const batch = ordered.slice(i, i + NORMALIZE_BATCH)
+    const result = await invoke<{ groups: LemmaGroup[] }>({
+      mode: 'normalize',
+      nativeLanguage,
+      candidates: batch,
+    })
+    groups.push(...(result.groups ?? []))
+    onProgress?.(Math.min(i + batch.length, ordered.length), ordered.length)
+  }
+
+  return mergeGroups(groups)
+}
+
+/**
+ * Folds together lemmas that different chunks reported separately. Keeps the first
+ * chunk's part of speech, and only drops a lemma when every chunk agreed it was junk —
+ * one chunk seeing a usable sense is enough to keep the word.
+ */
+export function mergeGroups(groups: LemmaGroup[]): LemmaGroup[] {
+  const byLemma = new Map<string, LemmaGroup>()
+
+  for (const group of groups) {
+    const key = group.lemma.trim().toLowerCase()
+    if (!key) continue
+    const existing = byLemma.get(key)
+    if (!existing) {
+      byLemma.set(key, { ...group, surfaces: [...group.surfaces] })
+      continue
+    }
+    for (const surface of group.surfaces) {
+      if (!existing.surfaces.includes(surface)) existing.surfaces.push(surface)
+    }
+    if (!group.drop) {
+      existing.drop = false
+      existing.dropReason = ''
+    }
+  }
+
+  return [...byLemma.values()]
 }
 
 export async function translateLemmas(

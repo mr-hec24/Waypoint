@@ -74,10 +74,16 @@ export function ListReview({ sources, locale, onCancel, onFinished }: Props) {
         return
       }
       try {
-        if (!cancelled) setPhase('normalizing')
+        if (!cancelled) {
+          setPhase('normalizing')
+          setProgress({ done: 0, total: candidates.length })
+        }
         const groups = await normalizeCandidates(
           nativeName,
           candidates.map((c) => ({ surface: c.surface, count: c.count })),
+          (done, total) => {
+            if (!cancelled) setProgress({ done, total })
+          },
         )
         if (cancelled) return
 
@@ -196,7 +202,7 @@ export function ListReview({ sources, locale, onCancel, onFinished }: Props) {
       <Busy
         title={phase === 'translating' ? 'Translating your words' : 'Sorting your words'}
         detail={
-          phase === 'translating'
+          progress.total > 0
             ? `${progress.done} of ${progress.total}`
             : `${candidates.length} candidates from your own speech`
         }

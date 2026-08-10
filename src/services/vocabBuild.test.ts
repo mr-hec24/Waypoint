@@ -1,5 +1,44 @@
 import { describe, expect, it } from 'vitest'
-import { errorDetail } from './vocabBuild'
+import { errorDetail, mergeGroups, type LemmaGroup } from './vocabBuild'
+
+function group(lemma: string, surfaces: string[], drop = false): LemmaGroup {
+  return { lemma, surfaces, partOfSpeech: 'verb', drop, dropReason: drop ? 'noise' : '' }
+}
+
+/** Normalize is chunked to stay inside the worker budget, so chunks must recombine. */
+describe('mergeGroups', () => {
+  it('unions surfaces when two chunks report the same lemma', () => {
+    const merged = mergeGroups([group('go', ['go', 'goes']), group('go', ['going', 'went'])])
+    expect(merged).toHaveLength(1)
+    expect(merged[0].surfaces).toEqual(['go', 'goes', 'going', 'went'])
+  })
+
+  it('matches lemmas case-insensitively without duplicating surfaces', () => {
+    const merged = mergeGroups([group('Work', ['work']), group('work', ['work', 'worked'])])
+    expect(merged).toHaveLength(1)
+    expect(merged[0].surfaces).toEqual(['work', 'worked'])
+  })
+
+  it('keeps a lemma when any chunk found it usable', () => {
+    // One chunk seeing only a proper-noun sense shouldn't lose the common word.
+    const merged = mergeGroups([group('mark', ['mark'], true), group('mark', ['marked'], false)])
+    expect(merged[0].drop).toBe(false)
+    expect(merged[0].dropReason).toBe('')
+  })
+
+  it('drops only when every chunk agreed', () => {
+    const merged = mergeGroups([group('uhh', ['uhh'], true), group('uhh', ['uhhh'], true)])
+    expect(merged[0].drop).toBe(true)
+  })
+
+  it('ignores blank lemmas rather than creating an empty entry', () => {
+    expect(mergeGroups([group('', ['x']), group('   ', ['y'])])).toEqual([])
+  })
+
+  it('leaves distinct lemmas alone', () => {
+    expect(mergeGroups([group('go', ['go']), group('eat', ['eat'])])).toHaveLength(2)
+  })
+})
 
 /**
  * supabase-js reports every non-2xx as the same opaque FunctionsHttpError. These cover
