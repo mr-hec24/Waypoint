@@ -25,6 +25,17 @@ function rowToRecording(row: RecordingRow): Recording {
 }
 
 export const recordingRepo: RecordingRepo = {
+  async get(userId, id) {
+    const { data, error } = await requireSupabase()
+      .from('recordings')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('id', id)
+      .maybeSingle()
+    throwIfError(error)
+    return data ? rowToRecording(data as RecordingRow) : null
+  },
+
   async list(userId, language) {
     let query = requireSupabase().from('recordings').select('*').eq('user_id', userId)
     if (language) query = query.eq('language', language)

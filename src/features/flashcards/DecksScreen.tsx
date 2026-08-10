@@ -31,8 +31,19 @@ export function DecksScreen() {
     <div>
       <h2 className="font-display mb-2 text-[27px] font-bold">Decks</h2>
       <p className="max-w-prose text-sm text-stone-500">
-        Add words manually for now — later they&apos;ll also arrive from your voice memos.
+        Add words manually, mine them from your story reviews, or build a deck out of the
+        vocabulary you already use every day.
       </p>
+
+      <Link
+        to="/vocabulary/build"
+        className="mt-4 block rounded-xl border border-stone-200 bg-card px-4 py-3 hover:border-primary-700"
+      >
+        <p className="text-sm font-bold">Build cards from your own speech →</p>
+        <p className="mt-0.5 text-xs text-stone-500">
+          Talk about your day, and the words you actually say become your deck.
+        </p>
+      </Link>
 
       <form onSubmit={handleCreate} className="mt-6 flex gap-2">
         <input

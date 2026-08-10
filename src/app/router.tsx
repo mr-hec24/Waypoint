@@ -17,6 +17,8 @@ import { LoginScreen } from '../features/auth/LoginScreen'
 import { OnboardingScreen } from '../features/intention/OnboardingScreen'
 import { AddLanguageScreen } from '../features/intention/AddLanguageScreen'
 import { StoryReviewScreen, WritingReviewScreen } from '../features/storyReview/StoryReviewScreen'
+import { VocabBuildScreen } from '../features/corpus/VocabBuildScreen'
+import { MethodScreen } from '../features/method/MethodScreen'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginScreen /> },
@@ -33,9 +35,12 @@ export const router = createBrowserRouter([
           // Review workbenches: focused work surfaces, also outside the tabs.
           { path: '/recordings/:recordingId/review', element: <StoryReviewScreen /> },
           { path: '/writing/:logId/review', element: <WritingReviewScreen /> },
+          // Building the starter list is a long sitting with a microphone — no tab bar.
+          { path: '/vocabulary/build', element: <VocabBuildScreen /> },
           {
             element: <Layout />,
             children: [
+              { path: '/method', element: <MethodScreen /> },
               { path: '/', element: <TodayScreen /> },
               { path: '/plan', element: <PlannerScreen /> },
               { path: '/review', element: <ReviewScreen /> },

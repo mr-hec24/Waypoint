@@ -4,6 +4,7 @@
 import type {
   ActivityKind,
   ActivityLog,
+  CorpusSource,
   Course,
   Deck,
   LibraryItem,
@@ -23,10 +24,22 @@ export interface ProfileRepo {
     patch: Partial<
       Pick<
         Profile,
-        'displayName' | 'languages' | 'activeLanguage' | 'intentionResurfaceEveryNSessions' | 'settings'
+        | 'displayName'
+        | 'nativeLanguage'
+        | 'languages'
+        | 'activeLanguage'
+        | 'intentionResurfaceEveryNSessions'
+        | 'settings'
+        | 'onboarding'
       >
     >,
   ): Promise<void>
+}
+
+export interface CorpusRepo {
+  listAll(userId: string, language: string): Promise<CorpusSource[]>
+  put(source: CorpusSource): Promise<void>
+  remove(id: string): Promise<void>
 }
 
 export interface DeckRepo {
@@ -101,6 +114,7 @@ export interface StoryReviewRepo {
 }
 
 export interface RecordingRepo {
+  get(userId: string, id: string): Promise<Recording | null>
   list(userId: string, language?: string): Promise<Recording[]>
   /** Uploads the blob to storage and inserts the metadata row. */
   create(recording: Recording, blob: Blob): Promise<void>

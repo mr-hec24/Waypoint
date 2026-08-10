@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from 'react-router'
 import { useProfile } from '../../services/queries/profile'
-import { activeJourney } from '../../domain/entities'
+import { isOnboarded } from '../../domain/entities'
 
 export function RequireOnboarded() {
   const { data: profile, isLoading, isError, error } = useProfile()
@@ -22,7 +22,9 @@ export function RequireOnboarded() {
     )
   }
 
-  if (!profile || !activeJourney(profile)?.intention) return <Navigate to="/onboarding" replace />
+  // Needs a destination AND a finished first run. Adding a second language deliberately
+  // sits outside this gate — /languages/new should not replay onboarding.
+  if (!profile || !isOnboarded(profile)) return <Navigate to="/onboarding" replace />
 
   return <Outlet />
 }
