@@ -168,34 +168,56 @@ Deno.serve(async (req) => {
   if (authError || !userData.user) return json({ error: 'Not authenticated' }, 401)
 
   const anthropic = new Anthropic({ apiKey: anthropicKey })
-  // Streaming: max_tokens this large risks an HTTP timeout on a non-streaming call.
-  const stream = anthropic.messages.stream({
-    model: 'claude-opus-5',
-    max_tokens: 32000,
-    thinking: { type: 'adaptive' },
-    output_config: {
-      format: {
-        type: 'json_schema',
-        schema: mode === 'normalize' ? NORMALIZE_SCHEMA : TRANSLATE_SCHEMA,
+
+  try {
+    // Streaming: max_tokens this large risks an HTTP timeout on a non-streaming call.
+    const stream = anthropic.messages.stream({
+      model: 'claude-opus-5',
+      max_tokens: 32000,
+      thinking: { type: 'adaptive' },
+      output_config: {
+        format: {
+          type: 'json_schema',
+          schema: mode === 'normalize' ? NORMALIZE_SCHEMA : TRANSLATE_SCHEMA,
+        },
+        // Normalizing is mechanical; choosing a beginner's sense of a word is not.
+        effort: mode === 'normalize' ? 'low' : 'medium',
       },
-      // Normalizing is mechanical; choosing a beginner's sense of a word is not.
-      effort: mode === 'normalize' ? 'low' : 'medium',
-    },
-    system:
-      mode === 'normalize'
-        ? normalizeSystem(nativeLanguage)
-        : translateSystem(nativeLanguage, targetLanguage!),
-    messages: [{ role: 'user', content: JSON.stringify(payload) }],
-  })
+      system:
+        mode === 'normalize'
+          ? normalizeSystem(nativeLanguage)
+          : translateSystem(nativeLanguage, targetLanguage!),
+      messages: [{ role: 'user', content: JSON.stringify(payload) }],
+    })
 
-  const response = await stream.finalMessage()
-  if (response.stop_reason === 'refusal') {
-    return json({ error: 'The model declined this request' }, 502)
-  }
-  const textBlock = response.content.find((b) => b.type === 'text')
-  if (!textBlock || textBlock.type !== 'text') {
-    return json({ error: 'Model returned no usable output' }, 502)
-  }
+    const response = await stream.finalMessage()
+    if (response.stop_reason === 'refusal') {
+      return json({ error: 'The model declined this request' }, 502)
+    }
+    // Hitting the cap mid-object leaves unparseable JSON; say so rather than
+    // failing on a syntax error the caller can't interpret.
+    if (response.stop_reason === 'max_tokens') {
+      return json(
+        { error: `Ran out of output room on ${itemCount} items. Try again with fewer.` },
+        502,
+      )
+    }
+    const textBlock = response.content.find((b) => b.type === 'text')
+    if (!textBlock || textBlock.type !== 'text') {
+      return json({ error: 'Model returned no usable output' }, 502)
+    }
 
-  return json(JSON.parse(textBlock.text))
+    return json(JSON.parse(textBlock.text))
+  } catch (e) {
+    // Without this the real cause (bad model id, unsupported parameter, rate limit,
+    // timeout) is swallowed into a generic 500 and the client just sees "non-2xx".
+    const err = e as { status?: number; message?: string; error?: unknown }
+    console.error('vocab_build failed', mode, itemCount, JSON.stringify(err.error ?? err.message))
+    return json(
+      {
+        error: `Claude call failed (${err.status ?? 'no status'}): ${err.message ?? String(e)}`,
+      },
+      502,
+    )
+  }
 })

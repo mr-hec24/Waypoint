@@ -42,10 +42,35 @@ export function isVocabBuildAvailable(): Promise<boolean> {
   return availability
 }
 
+/**
+ * supabase-js collapses every non-2xx into a generic FunctionsHttpError with data:null,
+ * so the function's own message is only reachable through error.context — the raw
+ * Response. Without reading it the caller can never see anything but
+ * "Edge Function returned a non-2xx status code".
+ */
+export async function errorDetail(error: unknown): Promise<string | null> {
+  const context = (error as { context?: unknown }).context
+  if (!(context instanceof Response)) return null
+  try {
+    const body = (await context.clone().json()) as { error?: unknown }
+    return typeof body.error === 'string' ? body.error : null
+  } catch {
+    try {
+      const text = await context.clone().text()
+      return text.slice(0, 300) || null
+    } catch {
+      return null
+    }
+  }
+}
+
 async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   if (!supabase) throw new Error('Supabase is not configured')
   const { data, error } = await supabase.functions.invoke('vocab_build', { body })
-  if (error) throw new Error(`Building your list failed: ${error.message}`)
+  if (error) {
+    const detail = await errorDetail(error)
+    throw new Error(detail ?? `Building your list failed: ${error.message}`)
+  }
   const result = data as T & { error?: string }
   if (result.error) throw new Error(result.error)
   return result
