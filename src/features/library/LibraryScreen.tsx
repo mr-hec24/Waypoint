@@ -6,6 +6,7 @@ import {
   useSaveLibraryItem,
   useDeleteLibraryItem,
   useSetStarredLibraryItem,
+  useLogLibraryRepetition,
 } from '../../services/queries/library'
 import {
   LIBRARY_ITEM_TYPES,
@@ -14,6 +15,8 @@ import {
   type LibraryItemType,
 } from '../../domain/entities'
 import { isEmbeddable } from './embed'
+import { RepProgress } from './RepProgress'
+import { formatLastRep } from './reps'
 
 const inputClass =
   'rounded-lg border border-stone-300 bg-card px-3 py-2 text-sm outline-none focus:border-primary-500'
@@ -31,6 +34,7 @@ export function LibraryScreen() {
   const saveItem = useSaveLibraryItem()
   const deleteItem = useDeleteLibraryItem()
   const setStarred = useSetStarredLibraryItem()
+  const logRep = useLogLibraryRepetition()
 
   const [type, setType] = useState<LibraryItemType>('show')
   const [title, setTitle] = useState('')
@@ -52,6 +56,8 @@ export function LibraryScreen() {
       title: title.trim(),
       url: trimmedUrl || null,
       starred: false,
+      repetitions: 0,
+      lastRepAt: null,
     })
     setTitle('')
     setUrl('')
@@ -130,43 +136,60 @@ export function LibraryScreen() {
           return (
             <div
               key={item.id}
-              className="flex items-center gap-3 rounded-xl border border-stone-200 bg-card px-4 py-3"
+              className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-card px-4 py-3"
             >
-              <button
-                onClick={() => setStarred.mutate(item.id)}
-                disabled={item.starred || setStarred.isPending}
-                title={item.starred ? 'Current focus' : 'Set as focus'}
-                aria-label={item.starred ? 'Current focus' : 'Set as focus'}
-                className={`shrink-0 text-lg leading-none ${
-                  item.starred ? 'text-output' : 'text-stone-300 hover:text-output'
-                }`}
-              >
-                {item.starred ? '★' : '☆'}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setStarred.mutate(item.id)}
+                  disabled={item.starred || setStarred.isPending}
+                  title={item.starred ? 'Current focus' : 'Set as focus'}
+                  aria-label={item.starred ? 'Current focus' : 'Set as focus'}
+                  className={`shrink-0 text-lg leading-none ${
+                    item.starred ? 'text-output' : 'text-stone-300 hover:text-output'
+                  }`}
+                >
+                  {item.starred ? '★' : '☆'}
+                </button>
 
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold">
-                  {item.title}
-                  <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-normal text-stone-500">
-                    {LIBRARY_TYPE_LABEL[item.type]}
-                  </span>
-                  {playable && (
-                    <span className="ml-1.5 text-xs font-semibold text-primary-700">
-                      · plays in-app
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">
+                    {item.title}
+                    <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-normal text-stone-500">
+                      {LIBRARY_TYPE_LABEL[item.type]}
                     </span>
-                  )}
-                </p>
-                {item.url && <p className="truncate text-xs text-stone-400">{item.url}</p>}
+                    {playable && (
+                      <span className="ml-1.5 text-xs font-semibold text-primary-700">
+                        · plays in-app
+                      </span>
+                    )}
+                  </p>
+                  {item.url && <p className="truncate text-xs text-stone-400">{item.url}</p>}
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (confirm(`Remove "${item.title}" from your library?`))
+                      deleteItem.mutate(item.id)
+                  }}
+                  className="shrink-0 text-xs text-stone-400 hover:text-output-deep"
+                >
+                  Delete
+                </button>
               </div>
 
-              <button
-                onClick={() => {
-                  if (confirm(`Remove "${item.title}" from your library?`)) deleteItem.mutate(item.id)
-                }}
-                className="shrink-0 text-xs text-stone-400 hover:text-output-deep"
-              >
-                Delete
-              </button>
+              <div className="flex items-center justify-between gap-3 border-t border-stone-100 pt-2 pl-8">
+                <div className="flex items-center gap-2">
+                  <RepProgress reps={item.repetitions} />
+                  <span className="text-xs text-stone-400">· last {formatLastRep(item.lastRepAt)}</span>
+                </div>
+                <button
+                  onClick={() => logRep.mutate(item)}
+                  disabled={logRep.isPending}
+                  className="shrink-0 rounded-lg bg-primary-50 px-3 pt-[7px] pb-[5px] text-xs font-bold text-primary-700 hover:bg-primary-100 disabled:opacity-50"
+                >
+                  + Log a rewatch
+                </button>
+              </div>
             </div>
           )
         })}

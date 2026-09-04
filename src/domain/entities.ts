@@ -33,12 +33,49 @@ export interface LanguageJourney {
   startedAt: number
 }
 
+/**
+ * The learner's own language. Unlike the free-text target language, this carries an
+ * ISO-639-1 code: Whisper wants one, and Intl.Segmenter wants it as a locale.
+ */
+export interface NativeLanguage {
+  name: string
+  code: string // ISO-639-1, or '' when the user picked "Other"
+}
+
+/** Progress through the guided first run. Stored as jsonb, so new fields need no migration. */
+export interface OnboardingState {
+  version: number
+  step: number
+  completedAt: number | null
+  /** True when the learner deferred building their starter vocabulary. */
+  corpusSkipped: boolean
+  /** Life-domain slugs the learner says they talk about — drives prompts and the balance meter. */
+  domains: string[]
+}
+
+export const ONBOARDING_VERSION = 1
+
+export const EMPTY_ONBOARDING: OnboardingState = {
+  version: ONBOARDING_VERSION,
+  step: 0,
+  completedAt: null,
+  corpusSkipped: false,
+  domains: [],
+}
+
 export interface Profile extends BaseEntity {
   displayName: string
+  nativeLanguage: NativeLanguage // shared across journeys — the driver doesn't change
   languages: LanguageJourney[]
   activeLanguage: string
   intentionResurfaceEveryNSessions: number
   settings: ProfileSettings // shared across journeys — the body is the same driver
+  onboarding: OnboardingState
+}
+
+/** Has the learner finished the guided first run? Drives the RequireOnboarded gate. */
+export function isOnboarded(profile: Profile): boolean {
+  return Boolean(profile.onboarding.completedAt) && Boolean(activeJourney(profile)?.intention)
 }
 
 /** The journey currently being driven; null until onboarding completes. */
@@ -201,11 +238,13 @@ export function newSrsState(now: number): SrsState {
   return { ease: 2.5, intervalDays: 0, reps: 0, lapses: 0, due: now, state: 'new' }
 }
 
-/** Where a word came from. voice_memo/import are seams for the future pipeline. */
+/** Where a word came from. import is a seam for the future pipeline. */
 export type WordSource =
   | { type: 'manual' }
   | { type: 'voice_memo'; recordingId: string; transcriptSpan: [number, number] }
   | { type: 'writing'; logId: string }
+  /** Mined from the learner's own native speech — see domain/corpus. */
+  | { type: 'corpus' }
   | { type: 'import' }
 
 export interface Word extends BaseEntity {
@@ -236,7 +275,12 @@ export interface LibraryItem extends BaseEntity {
   title: string
   url: string | null // optional; source of in-app embed detection
   starred: boolean // the single "focus" item — DB enforces one per (userId, language)
+  repetitions: number // how many times gone through — comprehensible input rewards repetition
+  lastRepAt: number | null // epoch ms of the most recent pass
 }
+
+/** Gentle default target for passes through one piece of content — a finish line, not a cap. */
+export const LIBRARY_REP_TARGET = 7
 
 export const LIBRARY_ITEM_TYPES: { type: LibraryItemType; label: string }[] = [
   { type: 'book', label: 'Book' },
@@ -272,9 +316,49 @@ export interface Recording extends BaseEntity {
   language: string // which journey this recording belongs to
   mimeType: string
   durationSec: number
-  context: 'story_speaking' | 'voice_memo'
+  context: 'story_speaking' | 'voice_memo' | 'native_corpus'
   storagePath: string // {userId}/{id}.{ext} in the "recordings" bucket
 }
+
+// ---------- Personal corpus (starter vocabulary) ----------
+
+export type CorpusSourceKind = 'recording' | 'upload' | 'transcript'
+
+export type CorpusSourceStatus = 'pending' | 'transcribing' | 'ready' | 'failed'
+
+/**
+ * One chunk of the learner's own NATIVE speech. Counting these gives a personal
+ * frequency list — the words they actually use — which becomes the starter deck.
+ *
+ * `speakers` matters because Whisper does no diarization: a two-way recording is
+ * one blended transcript, so a 'mixed' source only half-counts toward the learner.
+ */
+export interface CorpusSource extends BaseEntity {
+  language: string // the TARGET-language journey this corpus feeds
+  kind: CorpusSourceKind
+  label: string // prompt title, or the uploaded filename
+  domain: string // life-domain slug; '' when freeform
+  promptId: string | null
+  recordingId: string | null // set for kind 'recording' | 'upload'; null once audio is discarded
+  speakers: 'solo' | 'mixed'
+  status: CorpusSourceStatus
+  error: string | null
+  transcript: string // editable — the learner can trim the other speaker
+  tokenCount: number // denormalized so the source list renders without recounting
+  durationSec: number
+}
+
+/** Own-speech tokens where the personal core is captured and the list is usable. */
+export const CORPUS_CORE_TOKENS = 2000
+
+/** Own-speech tokens for the recommended seed — roughly 250–350 entries. */
+export const CORPUS_SEED_TOKENS = 4500
+
+/** Tokens in one domain before its balance dot fills. */
+export const CORPUS_DOMAIN_TOKENS = 400
+
+/** The long-run goal the list grows into over weeks, not a signup requirement. */
+export const CORPUS_LIST_TARGET = 1000
 
 // ---------- Story review (three-column method) ----------
 

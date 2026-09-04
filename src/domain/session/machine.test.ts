@@ -1,9 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { createSession, reduce } from './machine'
-import type { Session } from '../entities'
+import { blockActivityMinutes, createSession, reduce } from './machine'
+import type { BlockActual, PlannedBlock, Session } from '../entities'
 
 const NOW = Date.parse('2026-01-01T10:00:00Z')
 const MIN = 60 * 1000
+
+/** A 60-min block: 20 min input (flashcards) then 40 min output (conversation). */
+function portionedBlock(): PlannedBlock {
+  return {
+    id: 'b1',
+    activities: [
+      { kind: 'flashcards', plannedMinutes: 20 },
+      { kind: 'conversation', plannedMinutes: 40 },
+    ],
+    plannedMinutes: 60,
+  }
+}
+
+function actual(over: Partial<BlockActual>): BlockActual {
+  return { blockId: 'b1', startedAt: NOW, endedAt: NOW + 60 * MIN, ...over }
+}
 
 function twoBlockSession(): Session {
   return createSession({
@@ -167,5 +183,72 @@ describe('session machine', () => {
     const rehydrated = reduce(persisted, { type: 'TICK', now: NOW + 95 * MIN })
     expect(rehydrated.status).toBe('break')
     expect(rehydrated.run.phaseEndsAt).toBe(NOW + 110 * MIN) // break window preserved
+  })
+})
+
+describe('blockActivityMinutes', () => {
+  it('credits a fully-completed input leg in full when the block ends there (the 7-min bug)', () => {
+    // User did the whole 20-min input leg, then ended the block without output.
+    // inputEndedAt is null because the input timer elapsed naturally.
+    const mins = blockActivityMinutes(portionedBlock(), actual({ endedAt: NOW + 20 * MIN }))
+    expect(mins).toEqual([
+      { kind: 'flashcards', minutes: 20 }, // was mis-scaled to 7 before the fix
+      { kind: 'conversation', minutes: 0 },
+    ])
+  })
+
+  it('splits a full block into its planned legs', () => {
+    const mins = blockActivityMinutes(portionedBlock(), actual({}))
+    expect(mins).toEqual([
+      { kind: 'flashcards', minutes: 20 },
+      { kind: 'conversation', minutes: 40 },
+    ])
+  })
+
+  it('honors an explicit early switch to output', () => {
+    // Switched to output after 8 min, ran the block to its full 60.
+    const mins = blockActivityMinutes(
+      portionedBlock(),
+      actual({ inputEndedAt: NOW + 8 * MIN }),
+    )
+    expect(mins).toEqual([
+      { kind: 'flashcards', minutes: 8 },
+      { kind: 'conversation', minutes: 52 },
+    ])
+  })
+
+  it('credits input only when the block ends mid-input leg', () => {
+    const mins = blockActivityMinutes(portionedBlock(), actual({ endedAt: NOW + 12 * MIN }))
+    expect(mins).toEqual([
+      { kind: 'flashcards', minutes: 12 },
+      { kind: 'conversation', minutes: 0 },
+    ])
+  })
+
+  it('never credits output past the block end when the switch was late', () => {
+    // Block ended (30 min) before reaching an inputEndedAt that sits later.
+    const mins = blockActivityMinutes(
+      portionedBlock(),
+      actual({ endedAt: NOW + 30 * MIN, inputEndedAt: NOW + 45 * MIN }),
+    )
+    expect(mins).toEqual([
+      { kind: 'flashcards', minutes: 30 },
+      { kind: 'conversation', minutes: 0 },
+    ])
+  })
+
+  it('returns nothing for a block that never ended', () => {
+    expect(blockActivityMinutes(portionedBlock(), actual({ endedAt: null }))).toEqual([])
+  })
+
+  it('falls back to proportional scaling for a legacy single-activity block', () => {
+    const legacy: PlannedBlock = {
+      id: 'b1',
+      activities: [{ kind: 'flashcards', plannedMinutes: 90 }],
+      plannedMinutes: 90,
+    }
+    // Ran 45 of 90 planned minutes → half credit.
+    const mins = blockActivityMinutes(legacy, actual({ endedAt: NOW + 45 * MIN }))
+    expect(mins).toEqual([{ kind: 'flashcards', minutes: 45 }])
   })
 })

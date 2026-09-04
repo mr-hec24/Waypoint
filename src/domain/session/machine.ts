@@ -2,7 +2,8 @@
 // refresh, tab close, or device switch can always resolve the current state
 // from the persisted session plus the current time.
 
-import type { PlannedBlock, Session, SessionRun } from '../entities'
+import { PILLAR_BY_KIND } from '../entities'
+import type { ActivityKind, BlockActual, PlannedBlock, Session, SessionRun } from '../entities'
 
 const MIN_MS = 60 * 1000
 
@@ -175,6 +176,48 @@ export function reduce(session: Session, event: SessionEvent): Session {
       }
     }
   }
+}
+
+export interface ActivityMinutes {
+  kind: ActivityKind
+  minutes: number
+}
+
+/**
+ * Minutes to credit each of a block's activities, from what actually ran.
+ *
+ * A portioned block (one input activity then one output activity) splits real
+ * time at the *actual* input→output boundary — the explicit early switch
+ * (`inputEndedAt`) if the user tapped it, otherwise the planned end of the
+ * input leg — never proportionally. That way a fully-completed input leg is
+ * credited in full even when the block ends before the output leg runs. The
+ * old proportional scaling under-counted it (a completed 20-min input leg on a
+ * 60-min block logged as 20 × 20/60 ≈ 7 min).
+ *
+ * Legacy or single-leg blocks fall back to proportional scaling by plan.
+ */
+export function blockActivityMinutes(block: PlannedBlock, actual: BlockActual): ActivityMinutes[] {
+  if (actual.endedAt === null || block.plannedMinutes === 0) return []
+  const { startedAt, endedAt } = actual
+  const input = block.activities.find((a) => PILLAR_BY_KIND[a.kind] === 'input')
+  const output = block.activities.find((a) => PILLAR_BY_KIND[a.kind] === 'output')
+
+  if (input && output) {
+    const plannedBoundary = startedAt + input.plannedMinutes * MIN_MS
+    // Clamp to the real block window so a block ended during the input leg
+    // credits input only, and never past its end.
+    const boundary = Math.min(endedAt, actual.inputEndedAt ?? plannedBoundary)
+    return [
+      { kind: input.kind, minutes: Math.round((boundary - startedAt) / MIN_MS) },
+      { kind: output.kind, minutes: Math.round((endedAt - boundary) / MIN_MS) },
+    ]
+  }
+
+  const scale = Math.min(1, (endedAt - startedAt) / (block.plannedMinutes * MIN_MS))
+  return block.activities.map((a) => ({
+    kind: a.kind,
+    minutes: Math.round(a.plannedMinutes * scale),
+  }))
 }
 
 export { currentBlock }

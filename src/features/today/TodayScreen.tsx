@@ -1,8 +1,14 @@
 import { Link } from 'react-router'
 import { useProfile, useUpdateProfile } from '../../services/queries/profile'
 import { useActiveSession } from '../../services/queries/sessions'
+import { useStarredLibraryItem } from '../../services/queries/library'
 import { DestinationPlaque } from '../../components/DestinationPlaque'
-import { activeJourney } from '../../domain/entities'
+import { RepProgress } from '../library/RepProgress'
+import { repMessage } from '../library/reps'
+import { activeJourney, CORPUS_SEED_TOKENS } from '../../domain/entities'
+import { useCorpusSources } from '../../services/queries/corpus'
+import { corpusStats } from '../../domain/corpus/frequency'
+import { starterListNudge } from '../corpus/messages'
 import {
   localDateString,
   todayBounds,
@@ -32,6 +38,12 @@ export function TodayScreen() {
   const updateProfile = useUpdateProfile()
   const journey = profile ? activeJourney(profile) : null
   const { data: activeSession } = useActiveSession()
+  const { data: focusItem } = useStarredLibraryItem()
+  const { data: corpusSources } = useCorpusSources()
+  const corpusTokens = corpusStats(
+    (corpusSources ?? []).filter((s) => s.status === 'ready'),
+    profile?.nativeLanguage.code || 'en',
+  ).tokens
   const bounds = todayBounds()
   const { data: todayLogs } = useActivityLogs(bounds.from, bounds.to)
   const { data: sleepLogs } = useSleepLogs(1)
@@ -96,6 +108,46 @@ export function TodayScreen() {
         <div className="mt-4">
           <DestinationPlaque statement={journey.intention.statement} />
         </div>
+      )}
+
+      {focusItem && (
+        <Link
+          to="/library"
+          className="mt-4 block rounded-xl border border-stone-200 bg-card px-4 py-3 hover:border-primary-700"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10.5px] font-extrabold tracking-[.18em] text-stone-500 uppercase">
+                ★ Current focus
+              </p>
+              <p className="truncate text-sm font-bold">{focusItem.title}</p>
+            </div>
+            <RepProgress reps={focusItem.repetitions} />
+          </div>
+          <p className="mt-1.5 text-xs text-stone-500 italic">{repMessage(focusItem.repetitions)}</p>
+        </Link>
+      )}
+
+      {corpusTokens < CORPUS_SEED_TOKENS && profile && (
+        <Link
+          to="/vocabulary/build"
+          className="mt-4 block rounded-xl border border-stone-200 bg-card px-4 py-3 hover:border-primary-700"
+        >
+          <p className="text-[10.5px] font-extrabold tracking-[.18em] text-stone-500 uppercase">
+            Starter vocabulary
+          </p>
+          <p className="mt-0.5 text-sm font-bold">
+            {starterListNudge(profile.onboarding, corpusTokens)}
+          </p>
+          {corpusTokens > 0 && (
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200">
+              <div
+                className="h-full rounded-full bg-input"
+                style={{ width: `${Math.min(100, (corpusTokens / CORPUS_SEED_TOKENS) * 100)}%` }}
+              />
+            </div>
+          )}
+        </Link>
       )}
 
       <div className="mt-5 grid grid-cols-2 gap-2.5">

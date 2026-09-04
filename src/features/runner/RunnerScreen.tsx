@@ -6,58 +6,51 @@ import { useSessionTicker } from './useSessionTicker'
 import { HoldToConfirm } from '../../components/HoldToConfirm'
 import { TimerRing, formatRemaining } from '../../components/TimerRing'
 import { DestinationPlaque } from '../../components/DestinationPlaque'
-import { currentBlock } from '../../domain/session/machine'
+import { blockActivityMinutes, currentBlock } from '../../domain/session/machine'
+import { useQueryClient } from '@tanstack/react-query'
 import { activityLogRepo } from '../../services/supabase/logRepos'
+import { libraryRepo } from '../../services/supabase/libraryRepo'
 import { StorySpeaking } from './StorySpeaking'
 import { WritingExercise } from './WritingExercise'
 import { StarredImmersionPanel } from '../library/StarredImmersionPanel'
+import { RepProgress } from '../library/RepProgress'
+import { useStarredLibraryItem } from '../../services/queries/library'
 import { PILLAR_BY_KIND, type ActivityKind, type ActivityLog, type Session } from '../../domain/entities'
 
-/** One log per activity per block that actually ran, scaled to the block's real duration. */
-function buildSessionLogs(session: Session): ActivityLog[] {
+/** One log per activity per block that actually ran, credited by the real time each leg got.
+ *  `focusTitle` names the starred library item so immersion logs record what was watched. */
+function buildSessionLogs(session: Session, focusTitle: string | null = null): ActivityLog[] {
+  const emptyDetails: Record<ActivityKind, ActivityLog['details']> = {
+    flashcards: { cardsReviewed: 0, cardsCorrect: 0 },
+    course: { courseId: '', unitLabel: '' },
+    immersion: { medium: 'other', title: focusTitle ?? '' },
+    story_speaking: { promptText: '', recordingId: null },
+    writing: { promptText: '', text: '' },
+    conversation: { partnerType: 'other' },
+  }
   const logs: ActivityLog[] = []
   for (const actual of session.run.blockActuals) {
-    if (actual.endedAt === null) continue
     const block = session.plan.blocks.find((b) => b.id === actual.blockId)
-    if (!block || block.plannedMinutes === 0) continue
-    const scale = Math.min(1, (actual.endedAt - actual.startedAt) / (block.plannedMinutes * 60000))
-    for (const activity of block.activities) {
+    if (!block) continue
+    for (const { kind, minutes } of blockActivityMinutes(block, actual)) {
       // Story speaking and writing log themselves in-session (with recording /
       // text attached) — logging them again here would double-count.
-      if (activity.kind === 'story_speaking' || activity.kind === 'writing') continue
-      let minutes = Math.round(activity.plannedMinutes * scale)
-      // When the input leg was ended early, split by what actually happened.
-      if (actual.inputEndedAt != null) {
-        const pillar = PILLAR_BY_KIND[activity.kind]
-        const raw =
-          pillar === 'input'
-            ? actual.inputEndedAt - actual.startedAt
-            : actual.endedAt - actual.inputEndedAt
-        minutes = Math.max(0, Math.round(raw / 60000))
-      }
-      if (minutes === 0) continue
-      const emptyDetails: Record<ActivityKind, ActivityLog['details']> = {
-        flashcards: { cardsReviewed: 0, cardsCorrect: 0 },
-        course: { courseId: '', unitLabel: '' },
-        immersion: { medium: 'other', title: '' },
-        story_speaking: { promptText: '', recordingId: null },
-        writing: { promptText: '', text: '' },
-        conversation: { partnerType: 'other' },
-      }
+      if (kind === 'story_speaking' || kind === 'writing') continue
+      if (minutes <= 0) continue
       logs.push({
         id: crypto.randomUUID(),
         userId: session.userId,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        kind: activity.kind,
-        pillar: PILLAR_BY_KIND[activity.kind],
+        kind,
+        pillar: PILLAR_BY_KIND[kind],
         language: session.language,
         sessionId: session.id,
         occurredAt: actual.startedAt,
         durationMinutes: minutes,
         notes: '',
-        title: null,
-        details: emptyDetails[activity.kind],
+        title: kind === 'immersion' ? focusTitle : null,
+        details: emptyDetails[kind],
       } as ActivityLog)
     }
   }
@@ -82,6 +75,7 @@ export function RunnerScreen() {
   const clear = useSessionStore((s) => s.clear)
   const hydrate = useSessionStore((s) => s.hydrate)
   const now = useSessionTicker()
+  const { data: focusItem } = useStarredLibraryItem()
   const [hydrating, setHydrating] = useState(true)
 
   useEffect(() => {
@@ -394,6 +388,29 @@ export function RunnerScreen() {
         {run.blockActuals.length} block{run.blockActuals.length !== 1 ? 's' : ''} driven
         {run.breaksSkipped > 0 && ` · ${run.breaksSkipped} break${run.breaksSkipped > 1 ? 's' : ''} skipped`}
       </p>
+
+      {status === 'completed' &&
+        plan.blocks.some((b) => b.activities.some((a) => a.kind === 'immersion')) &&
+        focusItem && (
+          <div className="w-full max-w-sm rounded-xl border border-stone-200 bg-card px-4 py-4">
+            <p className="text-[10.5px] font-extrabold tracking-[.18em] text-stone-500 uppercase">
+              ★ Your focus
+            </p>
+            <p className="font-display mt-1 text-lg font-bold">{focusItem.title}</p>
+            <div className="mt-2 flex justify-center">
+              <RepProgress reps={focusItem.repetitions} />
+            </div>
+            <p className="mt-3 text-[13px] text-stone-600">
+              Repetition is where comprehension locks in — keep it starred for another pass next time,
+              or{' '}
+              <Link to="/library" className="font-bold text-primary-700 underline">
+                pick something new
+              </Link>
+              .
+            </p>
+          </div>
+        )}
+
       <FinishButton session={session} onDone={() => { clear(); navigate('/') }} />
     </div>
   )
@@ -408,15 +425,37 @@ function FinishButton({ session, onDone }: { session: Session; onDone: () => voi
   const [state, setState] = useState<'logging' | 'logged' | 'error'>(hasWork ? 'logging' : 'logged')
   const [error, setError] = useState<string | null>(null)
   const ran = useRef(false)
+  const queryClient = useQueryClient()
 
   async function runLog() {
     setState('logging')
     setError(null)
     try {
+      // If immersion was planned, credit the starred focus item — name its logs and count a rep.
+      const plannedImmersion = session.plan.blocks.some((b) =>
+        b.activities.some((a) => a.kind === 'immersion'),
+      )
+      const focus = plannedImmersion
+        ? (await libraryRepo.listAll(session.userId, session.language)).find((i) => i.starred) ?? null
+        : null
+
       const existing = await activityLogRepo.bySession(session.userId, session.id)
       const alreadyLogged = new Set(existing.map((l) => l.kind))
-      const logs = buildSessionLogs(session).filter((l) => !alreadyLogged.has(l.kind))
+      const logs = buildSessionLogs(session, focus?.title ?? null).filter(
+        (l) => !alreadyLogged.has(l.kind),
+      )
       await Promise.all(logs.map((log) => activityLogRepo.put(log)))
+
+      // Count one pass only when a *new* immersion log was written this run (idempotent on re-finish).
+      if (focus && logs.some((l) => l.kind === 'immersion')) {
+        await libraryRepo.put({
+          ...focus,
+          repetitions: focus.repetitions + 1,
+          lastRepAt: Date.now(),
+          updatedAt: Date.now(),
+        })
+        void queryClient.invalidateQueries({ queryKey: ['library', session.userId] })
+      }
       setState('logged')
     } catch (e) {
       setError((e as Error).message)

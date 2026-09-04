@@ -189,6 +189,24 @@ export function SettingsScreen() {
       </div>
 
       <div className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-card p-4">
+        <p className="text-[10.5px] font-extrabold tracking-[.2em] text-stone-500 uppercase">
+          The method
+        </p>
+        <Link
+          to="/method"
+          className="self-start rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+        >
+          How the method works
+        </Link>
+        <Link
+          to="/vocabulary/build"
+          className="self-start rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+        >
+          Build vocabulary from your speech
+        </Link>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-card p-4">
         <p className="text-[10.5px] font-extrabold tracking-[.2em] text-stone-500 uppercase">Data</p>
         <button
           onClick={handleExport}
