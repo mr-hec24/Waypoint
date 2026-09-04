@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router'
 
 const tabs = [
   { to: '/', label: 'Today' },
@@ -9,6 +10,11 @@ const tabs = [
   { to: '/logs', label: 'Logs' },
   { to: '/settings', label: 'Settings' },
 ]
+
+/* Seven stops don't fit across a phone. The four daily ones stay on the bar;
+   the rest live behind "More" so nothing runs off the edge of the screen. */
+const PRIMARY_TABS = tabs.slice(0, 4)
+const MORE_TABS = tabs.slice(4)
 
 /* Route-dot navigation: a small rust dot marks the active stop; inactive dots
    stay transparent so the layout never shifts. */
@@ -29,7 +35,26 @@ function RouteDot({ isActive }: { isActive: boolean }) {
   )
 }
 
+function matchesRoute(pathname: string, to: string) {
+  return to === '/' ? pathname === '/' : pathname === to || pathname.startsWith(`${to}/`)
+}
+
 export function Layout() {
+  const { pathname } = useLocation()
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreIsActive = MORE_TABS.some((t) => matchesRoute(pathname, t.to))
+
+  // Close the sheet whenever we land somewhere new, or on Escape.
+  useEffect(() => setMoreOpen(false), [pathname])
+  useEffect(() => {
+    if (!moreOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMoreOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [moreOpen])
+
   return (
     <div className="min-h-dvh md:flex">
       {/* Sidebar (desktop) */}
@@ -59,22 +84,67 @@ export function Layout() {
         <Outlet />
       </main>
 
+      {/* Backdrop for the "More" sheet (mobile) */}
+      {moreOpen && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={() => setMoreOpen(false)}
+          className="fixed inset-0 z-30 bg-stone-900/20 md:hidden"
+        />
+      )}
+
       {/* Bottom tab bar (mobile) */}
-      <nav
-        className="fixed inset-x-0 bottom-0 flex justify-around border-t border-stone-200 bg-card/95 pt-1 backdrop-blur md:hidden"
-        style={{ paddingBottom: 'calc(0.375rem + env(safe-area-inset-bottom))' }}
-      >
-        {tabs.map((t) => (
-          <NavLink key={t.to} to={t.to} end={t.to === '/'}>
-            {({ isActive }) => (
-              <span className={navClass({ isActive })}>
-                <RouteDot isActive={isActive} />
-                {t.label}
-              </span>
-            )}
-          </NavLink>
-        ))}
-      </nav>
+      <div className="fixed inset-x-0 bottom-0 z-40 md:hidden">
+        {moreOpen && (
+          <div
+            id="more-tabs"
+            className="mx-2 mb-1 overflow-hidden rounded-2xl border border-stone-200 bg-card shadow-lg"
+          >
+            {MORE_TABS.map((t) => (
+              <NavLink key={t.to} to={t.to}>
+                {({ isActive }) => (
+                  <span
+                    className={[
+                      'flex items-center gap-2.5 border-b border-stone-100 px-4 py-3.5 text-[11px] font-extrabold tracking-[.1em] uppercase transition-colors last:border-b-0',
+                      isActive ? 'text-primary-700' : 'text-stone-500',
+                    ].join(' ')}
+                  >
+                    <RouteDot isActive={isActive} />
+                    {t.label}
+                  </span>
+                )}
+              </NavLink>
+            ))}
+          </div>
+        )}
+
+        <nav
+          className="flex justify-around border-t border-stone-200 bg-card/95 pt-1 backdrop-blur"
+          style={{ paddingBottom: 'calc(0.375rem + env(safe-area-inset-bottom))' }}
+        >
+          {PRIMARY_TABS.map((t) => (
+            <NavLink key={t.to} to={t.to} end={t.to === '/'}>
+              {({ isActive }) => (
+                <span className={navClass({ isActive })}>
+                  <RouteDot isActive={isActive} />
+                  {t.label}
+                </span>
+              )}
+            </NavLink>
+          ))}
+          <button
+            type="button"
+            onClick={() => setMoreOpen((v) => !v)}
+            aria-expanded={moreOpen}
+            aria-controls="more-tabs"
+            className={navClass({ isActive: moreIsActive || moreOpen })}
+          >
+            <RouteDot isActive={moreIsActive} />
+            More
+          </button>
+        </nav>
+      </div>
     </div>
   )
 }
